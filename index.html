@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кабінет інструктора</title>
+  <style>
+    :root { --primary: #0f172a; --accent: #2563eb; --success: #16a34a; --danger: #dc2626; --bg: #f1f5f9; --card: #fff; --border: #e2e8f0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background: var(--bg); color: #334155; padding: 16px; min-height: 100vh; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { background: var(--primary); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: gap: 10px; }
+    .card { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border); }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 180px; margin-bottom: 12px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 4px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
+    input:focus { border-color: var(--accent); }
+    .btn { padding: 9px 16px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
+    .btn-success { background: var(--success); }
+    .btn-danger { background: var(--danger); }
+    .btn-secondary { background: #64748b; }
+    
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+    th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: #f8fafc; font-weight: 600; color: #475569; }
+    
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+    .badge-process { background: #e0f2fe; color: #0369a1; }
+    .badge-completed { background: #dcfce7; color: #15803d; }
+    .badge-failed { background: #fee2e2; color: #991b1b; }
+
+    .hidden { display: none !important; }
+    .alert { padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+    .alert-danger { background: #fee2e2; color: #991b1b; }
+    .alert-success { background: #dcfce7; color: #166534; }
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 16px; }
+    .modal { background: white; padding: 24px; border-radius: 12px; max-width: 420px; width: 100%; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Конфіденційний кабінет інструктора</h1>
+      <button class="btn btn-secondary hidden" id="btn-logout" onclick="logout()">Вийти</button>
+    </header>
+
+    <!-- Крок 1: Введення PIN-коду та коду заходу -->
+    <div class="card" id="card-auth">
+      <h2 style="font-size: 16px; margin-bottom: 12px;">Авторизація доступу</h2>
+      <div id="error-auth" class="alert alert-danger hidden"></div>
+      <form id="form-auth" onsubmit="loadDashboard(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="eventCode">Код заходу</label>
+            <input type="text" id="eventCode" placeholder="22144" required>
+          </div>
+          <div class="form-group">
+            <label for="pinCode">PIN-код інструктора</label>
+            <input type="password" id="pinCode" placeholder="••••" required>
+          </div>
+          <div style="display: flex; align-items: flex-end; margin-bottom: 12px;">
+            <button type="submit" class="btn" id="btn-enter">Увійти</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Крок 2: Панель керування учасниками -->
+    <div class="card hidden" id="card-dash">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 id="dash-event-title" style="font-size: 16px; color: var(--primary);">Назва заходу</h3>
+          <span style="font-size: 12px; color: #64748b;" id="dash-count">Загалом: 0</span>
+        </div>
+        <button class="btn btn-success" onclick="openModal()">+ Додати учасника</button>
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <input type="text" id="search" placeholder="Пошук за прізвищем або телефоном..." oninput="filterList()">
+      </div>
+
+      <div id="dash-alert" class="alert hidden"></div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Учасник</th>
+              <th>Контакт</th>
+              <th>Статус проходження</th>
+              <th>Історія чек-інів (усі дні)</th>
+              <th>Дії</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <!-- Заповнюється динамічно -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальне вікно ручного додавання -->
+  <div id="modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 style="margin-bottom: 12px;">Ручне додавання учасника</h3>
+      <div id="modal-err" class="alert alert-danger hidden"></div>
+      <form id="form-add" onsubmit="addUser(event)">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label>Телефон</label>
+          <input type="tel" id="add-phone" placeholder="0671234567" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label>ПІБ (Українською)</label>
+          <input type="text" id="add-name" placeholder="Шевченко Т. Г." required>
+        </div>
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label>ПІБ (Латиницею)</label>
+          <input type="text" id="add-latin" placeholder="Taras Shevchenko">
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="submit" class="btn btn-success" style="flex: 1;" id="btn-save">Зберегти</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Скасувати</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvyuPnJDnTSMT5gxr2jQu1brSa6OammhMQqn_6xopBUCXsxbcupB2Co9MCS7gZkG0/exec";
+    let state = { eventCode: "", pin: "" };
+    let participants = [];
+
+    async function loadDashboard(e) {
+      e.preventDefault();
+      state.eventCode = document.getElementById("eventCode").value.trim();
+      state.pin = document.getElementById("pinCode").value.trim();
+      
+      const btn = document.getElementById("btn-enter");
+      btn.disabled = true; btn.innerText = "Вхід...";
+      hideAlert("error-auth");
+
+      try {
+        const res = await (await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "getParticipants", eventCode: state.eventCode, pin: state.pin })
+        })).json();
+
+        if (!res.success) { showAlert("error-auth", res.message); return; }
+
+        document.getElementById("dash-event-title").innerText = res.eventName;
+        participants = res.participants || [];
+        renderTable(participants);
+
+        document.getElementById("card-auth").classList.add("hidden");
+        document.getElementById("card-dash").classList.remove("hidden");
+        document.getElementById("btn-logout").classList.remove("hidden");
+      } catch (err) {
+        showAlert("error-auth", "Помилка зв'язку із сервером.");
+      } finally { btn.disabled = false; btn.innerText = "Увійти"; }
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById("tbody");
+      tbody.innerHTML = "";
+      document.getElementById("dash-count").innerText = `Загалом у журналі: ${list.length}`;
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b; padding:20px;">Учасників немає</td></tr>`;
+        return;
+      }
+
+      list.forEach(p => {
+        let badgeClass = "badge-process";
+        if (p.status === "Завершив") badgeClass = "badge-completed";
+        if (p.status === "Не завершив") badgeClass = "badge-failed";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${p.fullName}</strong><br><small style="color:#64748b">${p.latinName || ''}</small></td>
+          <td>${p.phone}<br><small style="color:#64748b">Рег: ${p.firstReg}</small></td>
+          <td>
+            <span class="badge ${badgeClass}">${p.status}</span><br>
+            <div style="margin-top: 4px; display:flex; gap:4px;">
+              <button class="btn btn-success" style="padding:2px 6px; font-size:11px;" onclick="updateStatus('${p.phone}', 'Завершив')">Завершив</button>
+              <button class="btn btn-danger" style="padding:2px 6px; font-size:11px;" onclick="updateStatus('${p.phone}', 'Не завершив')">Не завершив</button>
+            </div>
+          </td>
+          <td style="font-family: monospace; font-size: 12px; color: #0f172a;">${p.checkins.replace(/;/g, '<br>')}</td>
+          <td>
+            <button class="btn" style="padding:6px 10px; font-size:12px;" onclick="checkInUser('${p.phone}', this)">+ Чек-ін сьогодні</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function checkInUser(phone, btn) {
+      btn.disabled = true; btn.innerText = "...";
+      try {
+        const res = await (await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "instructorCheckIn", eventCode: state.eventCode, pin: state.pin, phone: phone })
+        })).json();
+
+        if (res.success) {
+          const user = participants.find(p => p.phone === phone);
+          if (user) user.checkins = res.checkins;
+          renderTable(participants);
+          showDashAlert(res.message, "success");
+        } else { showDashAlert(res.message, "danger"); }
+      } catch (e) { showDashAlert("Помилка мережі", "danger"); }
+      finally { btn.disabled = false; btn.innerText = "+ Чек-ін сьогодні"; }
+    }
+
+    async function updateStatus(phone, status) {
+      try {
+        const res = await (await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "instructorUpdateStatus", eventCode: state.eventCode, pin: state.pin, phone: phone, status: status })
+        })).json();
+
+        if (res.success) {
+          const user = participants.find(p => p.phone === phone);
+          if (user) user.status = status;
+          renderTable(participants);
+          showDashAlert(res.message, "success");
+        } else { showDashAlert(res.message, "danger"); }
+      } catch (e) { showDashAlert("Помилка мережі", "danger"); }
+    }
+
+    function filterList() {
+      const q = document.getElementById("search").value.toLowerCase();
+      const filtered = participants.filter(p => p.fullName.toLowerCase().includes(q) || p.phone.includes(q));
+      renderTable(filtered);
+    }
+
+    function openModal() { document.getElementById("modal").classList.remove("hidden"); document.getElementById("form-add").reset(); }
+    function closeModal() { document.getElementById("modal").classList.add("hidden"); }
+
+    async function addUser(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btn-save");
+      btn.disabled = true; btn.innerText = "Збереження...";
+
+      try {
+        const res = await (await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "instructorAddUser",
+            eventCode: state.eventCode,
+            pin: state.pin,
+            phone: document.getElementById("add-phone").value,
+            fullName: document.getElementById("add-name").value,
+            latinName: document.getElementById("add-latin").value
+          })
+        })).json();
+
+        if (!res.success) { showAlert("modal-err", res.message); return; }
+        closeModal();
+        // Перезавантажуємо дані
+        document.getElementById("form-auth").dispatchEvent(new Event("submit"));
+        showDashAlert(res.message, "success");
+      } catch (err) { showAlert("modal-err", "Помилка зв'язку."); }
+      finally { btn.disabled = false; btn.innerText = "Зберегти"; }
+    }
+
+    function logout() {
+      document.getElementById("card-dash").classList.add("hidden");
+      document.getElementById("card-auth").classList.remove("hidden");
+      document.getElementById("btn-logout").classList.add("hidden");
+      document.getElementById("form-auth").reset();
+    }
+
+    function showAlert(id, msg) { const el = document.getElementById(id); el.innerText = msg; el.classList.remove("hidden"); }
+    function hideAlert(id) { document.getElementById(id).classList.add("hidden"); }
+    function showDashAlert(msg, type) {
+      const el = document.getElementById("dash-alert");
+      el.className = `alert alert-${type === 'success' ? 'success' : 'danger'}`;
+      el.innerText = msg; el.classList.remove("hidden");
+      setTimeout(() => el.classList.add("hidden"), 3500);
+    }
+  </script>
+</body>
+</html>
