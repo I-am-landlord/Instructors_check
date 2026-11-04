@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Кабінет інструктора</title>
+  <title>Захищений кабінет інструктора</title>
   <style>
     :root { --primary: #0f172a; --accent: #2563eb; --success: #16a34a; --danger: #dc2626; --bg: #f1f5f9; --card: #fff; --border: #e2e8f0; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
     body { background: var(--bg); color: #334155; padding: 16px; min-height: 100vh; }
-    .container { max-width: 900px; margin: 0 auto; }
-    header { background: var(--primary); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: gap: 10px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    header { background: var(--primary); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     .card { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border); }
     .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .form-group { flex: 1; min-width: 180px; margin-bottom: 12px; }
@@ -24,7 +24,7 @@
     
     .table-container { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
     th { background: #f8fafc; font-weight: 600; color: #475569; }
     
     .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
@@ -44,11 +44,11 @@
 
   <div class="container">
     <header>
-      <h1>Конфіденційний кабінет інструктора</h1>
+      <h1>Кабінет інструктора</h1>
       <button class="btn btn-secondary hidden" id="btn-logout" onclick="logout()">Вийти</button>
     </header>
 
-    <!-- Крок 1: Введення PIN-коду та коду заходу -->
+    <!-- Авторизація -->
     <div class="card" id="card-auth">
       <h2 style="font-size: 16px; margin-bottom: 12px;">Авторизація доступу</h2>
       <div id="error-auth" class="alert alert-danger hidden"></div>
@@ -69,7 +69,7 @@
       </form>
     </div>
 
-    <!-- Крок 2: Панель керування учасниками -->
+    <!-- Дашборд -->
     <div class="card hidden" id="card-dash">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <div>
@@ -87,24 +87,18 @@
 
       <div class="table-container">
         <table>
-          <thead>
-            <tr>
-              <th>Учасник</th>
-              <th>Контакт</th>
-              <th>Статус проходження</th>
-              <th>Історія чек-інів (усі дні)</th>
-              <th>Дії</th>
-            </tr>
+          <thead id="table-head">
+            <!-- Динамічні заголовки (включаючи дати) -->
           </thead>
           <tbody id="tbody">
-            <!-- Заповнюється динамічно -->
+            <!-- Динамічні рядки -->
           </tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <!-- Модальне вікно ручного додавання -->
+  <!-- Модальне вікно -->
   <div id="modal" class="modal-backdrop hidden">
     <div class="modal">
       <h3 style="margin-bottom: 12px;">Ручне додавання учасника</h3>
@@ -131,8 +125,9 @@
   </div>
 
   <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvyuPnJDnTSMT5gxr2jQu1brSa6OammhMQqn_6xopBUCXsxbcupB2Co9MCS7gZkG0/exec";
+    const APPS_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
     let state = { eventCode: "", pin: "" };
+    let eventDates = [];
     let participants = [];
 
     async function loadDashboard(e) {
@@ -154,6 +149,7 @@
         if (!res.success) { showAlert("error-auth", res.message); return; }
 
         document.getElementById("dash-event-title").innerText = res.eventName;
+        eventDates = res.dates || [];
         participants = res.participants || [];
         renderTable(participants);
 
@@ -166,12 +162,24 @@
     }
 
     function renderTable(list) {
+      const thead = document.getElementById("table-head");
       const tbody = document.getElementById("tbody");
-      tbody.innerHTML = "";
       document.getElementById("dash-count").innerText = `Загалом у журналі: ${list.length}`;
 
+      // Рендеримо шапку таблиці
+      let headHtml = `<tr>
+        <th>Учасник</th>
+        <th>Телефон</th>
+        <th>Статус</th>`;
+      eventDates.forEach(date => {
+        headHtml += `<th>📅 ${date}</th>`;
+      });
+      headHtml += `<th>Дії</th></tr>`;
+      thead.innerHTML = headHtml;
+
+      tbody.innerHTML = "";
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b; padding:20px;">Учасників немає</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${4 + eventDates.length}" style="text-align:center; color:#64748b; padding:20px;">Учасників немає</td></tr>`;
         return;
       }
 
@@ -180,43 +188,51 @@
         if (p.status === "Завершив") badgeClass = "badge-completed";
         if (p.status === "Не завершив") badgeClass = "badge-failed";
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
+        let trHtml = `
           <td><strong>${p.fullName}</strong><br><small style="color:#64748b">${p.latinName || ''}</small></td>
-          <td>${p.phone}<br><small style="color:#64748b">Рег: ${p.firstReg}</small></td>
+          <td>${p.phone}</td>
           <td>
             <span class="badge ${badgeClass}">${p.status}</span><br>
             <div style="margin-top: 4px; display:flex; gap:4px;">
-              <button class="btn btn-success" style="padding:2px 6px; font-size:11px;" onclick="updateStatus('${p.phone}', 'Завершив')">Завершив</button>
-              <button class="btn btn-danger" style="padding:2px 6px; font-size:11px;" onclick="updateStatus('${p.phone}', 'Не завершив')">Не завершив</button>
+              <button class="btn btn-success" style="padding:2px 6px; font-size:10px;" onclick="updateStatus('${p.phone}', 'Завершив')">Завершив</button>
+              <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="updateStatus('${p.phone}', 'Не завершив')">Не завершив</button>
             </div>
-          </td>
-          <td style="font-family: monospace; font-size: 12px; color: #0f172a;">${p.checkins.replace(/;/g, '<br>')}</td>
-          <td>
-            <button class="btn" style="padding:6px 10px; font-size:12px;" onclick="checkInUser('${p.phone}', this)">+ Чек-ін сьогодні</button>
-          </td>
-        `;
+          </td>`;
+
+        // Виводимо час для кожної дати
+        eventDates.forEach(date => {
+          let timeVal = p.datesCheckins[date] || "—";
+          let isChecked = timeVal !== "—";
+          trHtml += `<td>
+            <span style="font-family:monospace; font-weight:${isChecked?'bold':'normal'}; color:${isChecked?'#16a34a':'#94a3b8'}">${timeVal}</span>
+            <br><button class="btn" style="padding:2px 5px; font-size:10px; margin-top:2px;" onclick="checkInDate('${p.phone}', '${date}', this)">+ Чек-ін</button>
+          </td>`;
+        });
+
+        trHtml += `<td><button class="btn btn-secondary" style="padding:5px 10px; font-size:11px;" onclick="checkInDate('${p.phone}', '', this)">Чек-ін (сьогодні)</button></td>`;
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = trHtml;
         tbody.appendChild(tr);
       });
     }
 
-    async function checkInUser(phone, btn) {
-      btn.disabled = true; btn.innerText = "...";
+    async function checkInDate(phone, dateStr, btn) {
+      btn.disabled = true; 
       try {
         const res = await (await fetch(APPS_SCRIPT_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "instructorCheckIn", eventCode: state.eventCode, pin: state.pin, phone: phone })
+          body: JSON.stringify({ action: "instructorCheckIn", eventCode: state.eventCode, pin: state.pin, phone: phone, date: dateStr })
         })).json();
 
         if (res.success) {
-          const user = participants.find(p => p.phone === phone);
-          if (user) user.checkins = res.checkins;
-          renderTable(participants);
+          // Перезавантажуємо дані щоб оновити таблицю
+          document.getElementById("form-auth").dispatchEvent(new Event("submit"));
           showDashAlert(res.message, "success");
         } else { showDashAlert(res.message, "danger"); }
       } catch (e) { showDashAlert("Помилка мережі", "danger"); }
-      finally { btn.disabled = false; btn.innerText = "+ Чек-ін сьогодні"; }
+      finally { btn.disabled = false; }
     }
 
     async function updateStatus(phone, status) {
@@ -247,9 +263,6 @@
 
     async function addUser(e) {
       e.preventDefault();
-      const btn = document.getElementById("btn-save");
-      btn.disabled = true; btn.innerText = "Збереження...";
-
       try {
         const res = await (await fetch(APPS_SCRIPT_URL, {
           method: "POST",
@@ -266,11 +279,9 @@
 
         if (!res.success) { showAlert("modal-err", res.message); return; }
         closeModal();
-        // Перезавантажуємо дані
         document.getElementById("form-auth").dispatchEvent(new Event("submit"));
         showDashAlert(res.message, "success");
       } catch (err) { showAlert("modal-err", "Помилка зв'язку."); }
-      finally { btn.disabled = false; btn.innerText = "Зберегти"; }
     }
 
     function logout() {
